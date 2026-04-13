@@ -63,10 +63,10 @@ services:
       # ── Computed from the app domain (no secret needed) ────────
       - key: QR_BASE_URL
         scope: RUN_TIME
-        value: https://nairobi-transit.ondigitalocean.app
-      - key: CALLBACK_URL
+        value: https://nairobi-transit-ainty.ondigitalocean.app
+      - key: DARAJA_CALLBACK_URL
         scope: RUN_TIME
-        value: https://nairobi-transit.ondigitalocean.app/api/payments/webhook
+        value: https://nairobi-transit-ainty.ondigitalocean.app/api/daraja/callback
 
   # ── Next.js frontend ──────────────────────────────────────────
   - name: web
@@ -84,7 +84,7 @@ services:
       # Baked into the Next.js bundle at build time
       - key: NEXT_PUBLIC_API_URL
         scope: BUILD_TIME
-        value: ${api.PUBLIC_URL}
+        value: https://nairobi-transit-ainty.ondigitalocean.app
 
 # Note: No databases section — the existing DO PostgreSQL cluster
 # (nairobi-transit-db) and Azure Redis are referenced via SECRET env vars.
