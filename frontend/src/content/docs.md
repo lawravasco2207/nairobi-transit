@@ -1,7 +1,3 @@
-> **Note:** The canonical source of truth for these docs is now `frontend/src/content/docs.md`.
-> Edit that file — it renders live at `/docs` on the app site.
-> This file is kept as a reference copy only.
-
 # Nairobi Transit — Technical Documentation
 
 Nairobi Transit is a cashless fare payment system built for Nairobi's matatu (minibus) network. It supports M-Pesa STK Push for smartphone users and USSD for feature phones, giving every passenger a way to pay without cash — regardless of device.
