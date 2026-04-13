@@ -1,0 +1,45 @@
+[package]
+name = "nairobi-transit"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Web framework
+axum = { version = "0.7", features = ["ws", "multipart"] }
+tokio = { version = "1", features = ["full"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Database
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono"] }
+
+# Redis
+redis = { version = "0.25", features = ["tokio-comp", "tokio-rustls-comp", "connection-manager"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# HTTP client (for Daraja + Africa's Talking calls)
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+
+# QR code generation
+qrcode = "0.14"
+image = "0.25"
+base64 = "0.22"
+
+# Auth
+bcrypt = "0.15"
+jsonwebtoken = "9"
+
+# Async streams (for WebSocket split)
+futures = "0.3"
+
+# Utilities
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+dotenvy = "0.15"
+anyhow = "1"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

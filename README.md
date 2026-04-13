@@ -1,0 +1,168 @@
+# Nairobi Transit — Cashless Matatu Payment System
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+Cashless fare payments for Nairobi's matatu network. Passengers pay via **M-Pesa STK Push** (smartphones) or **USSD** (any GSM phone — no data needed). Conductors manage trips from a live dashboard. Route and stop data comes from the **Digital Matatus** GIS dataset.
+
+> Full technical documentation: [docs/index.md](docs/index.md)
+
+---
+
+## What it does
+
+| Channel | Who uses it | How it works |
+|---------|-------------|--------------|
+| QR Code | Smartphone passengers | Scan code on seat → STK Push prompt on Safaricom |
+| USSD | Feature phone passengers | Dial `*384*[VehicleCode]#` → interactive menu → M-Pesa PIN |
+| Conductor Dashboard | Driver/conductor | Set route + fare → see payment confirmations live |
+| Transit Map | All passengers | Find nearby stops, search by name, plan route A→B |
+
+---
+
+## Architecture
+
+```
+  Passenger (QR)          Passenger (USSD)         Conductor
+       │                       │                       │
+       ▼                       ▼                       ▼
+  ┌────────────────────────────────────────────────────┐
+  │              Next.js Frontend (port 3000)           │
+  └──────────────────────┬─────────────────────────────┘
+                         │ REST + WebSocket
+  ┌──────────────────────▼─────────────────────────────┐
+  │              Rust / Axum API (port 8080)            │
+  │    handlers/ · db/ · services/ · cache/             │
+  └──┬───────────────┬─────────────────┬───────────────┘
+     │               │                 │
+     ▼               ▼                 ▼
+  Daraja 3.0    Africa's Talking   PostgreSQL 18
+  (M-Pesa       (USSD sessions     + Azure Redis
+  STK Push)      + SMS)            (session cache)
+```
+
+---
+
+## Project Structure
+
+```
+nairobi-transit/
+├── server/                   # Rust backend (Axum)
+│   ├── src/
+│   │   ├── main.rs           # Entry point + auto-migration runner
+│   │   ├── config.rs         # Environment-based configuration
+│   │   ├── domain/           # Trip, Payment, Vehicle types
+│   │   ├── db/               # SQLx query functions
+│   │   ├── handlers/         # HTTP + WebSocket handlers
+│   │   ├── services/         # Daraja, Africa's Talking, QR gen
+│   │   └── cache/            # Redis USSD session cache
+│   ├── migrations/           # SQL files run automatically on startup
+│   │   ├── 001–004           # Core schema (vehicles, trips, payments)
+│   │   ├── 005               # Transit stops + routes (GIS-backed)
+│   │   ├── 006               # Seed data — 4,284 stops, 136 routes
+│   │   └── 007               # Stop aliases + fuzzy search (pg_trgm)
+│   ├── Cargo.toml
+│   ├── Dockerfile            # Multi-stage production build
+│   └── .env.example          # Template for all env vars
+├── frontend/                 # Next.js 15 app
+│   ├── src/app/
+│   │   ├── page.tsx          # Passenger home (map + nearby stops)
+│   │   ├── ussd/             # USSD simulator page
+│   │   ├── register/         # Vehicle / conductor registration
+│   │   ├── settings/         # System status page
+│   │   └── conductor/        # Crew dashboard (redirect → /crew)
+│   └── src/lib/api.ts        # Typed API client
+├── GIS_DATA_2019/            # Digital Matatus shapefiles (2019)
+├── scripts/                  # Data processing utilities
+│   └── generate_gis_sql.py   # Converts shapefiles → SQL seed
+├── docs/
+│   └── index.md              # Full technical documentation
+├── .do/app.yaml              # DigitalOcean App Platform spec
+├── docker-compose.yml        # Local dev stack
+└── LICENSE                   # MIT
+```
+
+---
+
+## Quick Start (local dev)
+
+### Prerequisites
+
+| Tool | Version |
+|------|---------|
+| Rust | 1.85+ |
+| Node.js | 20+ |
+| PostgreSQL | 15+ |
+| Redis | 7+ |
+
+### 1. Clone and configure
+
+```bash
+git clone https://github.com/YOUR_USERNAME/nairobi-transit.git
+cd nairobi-transit
+
+# Backend
+cp server/.env.example server/.env
+# Edit server/.env with your credentials (see docs/index.md)
+```
+
+### 2. Start the backend
+
+```bash
+cd server
+cargo run
+# Migrations run automatically on first start
+# Server: http://localhost:8080
+```
+
+### 3. Start the frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+# App: http://localhost:3000
+```
+
+---
+
+## Environment Variables
+
+See [`server/.env.example`](server/.env.example) for the full list.
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `REDIS_URL` | Redis connection string |
+| `DARAJA_CONSUMER_KEY` | Safaricom Daraja API key |
+| `DARAJA_CONSUMER_SECRET` | Safaricom Daraja API secret |
+| `DARAJA_SHORTCODE` | M-Pesa Paybill/Till number |
+| `DARAJA_PASSKEY` | Lipa Na M-Pesa passkey |
+| `DARAJA_CALLBACK_URL` | Public URL for M-Pesa webhook |
+| `AT_USERNAME` | Africa's Talking username |
+| `AT_API_KEY` | Africa's Talking API key |
+| `JWT_SECRET` | Secret for conductor session tokens |
+
+> **Sandbox testing**: Set `DARAJA_BASE_URL=https://sandbox.safaricom.co.ke` and use the test shortcode `174379`. Test phone `254708374149` receives simulated STK prompts — **no real charges**.
+
+---
+
+## Deployment (DigitalOcean App Platform)
+
+1. Replace `YOUR_GITHUB_USERNAME/YOUR_REPO_NAME` in [`.do/app.yaml`](.do/app.yaml)
+2. Push to GitHub
+3. Go to [cloud.digitalocean.com/apps](https://cloud.digitalocean.com/apps) → create app → import from GitHub
+4. Set all secret env vars in the DO dashboard
+5. From that point, every push to `main` auto-deploys
+
+---
+
+## GIS Data
+
+Stop and route data comes from the **Digital Matatus** project — a collaboration between MIT Media Lab, the University of Nairobi, Columbia University, and Groupshot. See [docs/index.md](docs/index.md#gis-data--research) for full attribution and caveats about data age.
+
+---
+
+## License
+
+[MIT](LICENSE) — free to use, fork, and adapt. Attribution appreciated.
+

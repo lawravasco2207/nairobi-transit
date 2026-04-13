@@ -1,0 +1,13 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+@theme inline {
+  --color-transit-green: #00A650;
+  --color-transit-green-dark: #007A3D;
+  --color-transit-green-light: #E8F5E9;
+}
+
+/* Safaricom-style: system sans-serif, smooth rendering */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+}

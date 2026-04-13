@@ -1,0 +1,59 @@
+# =================================================================
+# Local development docker-compose
+# For production deployment to DigitalOcean: see .do/app.yaml
+# =================================================================
+version: '3.9'
+
+services:
+  app:
+    build: ./server
+    ports:
+      - "8080:8080"
+    env_file: ./server/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Browser-side: reaches backend via host-mapped port
+        NEXT_PUBLIC_API_URL: http://localhost:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  postgres:
+    image: postgis/postgis:16-3.4-alpine
+    environment:
+      POSTGRES_USER: transit
+      POSTGRES_PASSWORD: transit
+      POSTGRES_DB: nairobi_transit
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U transit"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:

@@ -1,0 +1,93 @@
+# DigitalOcean App Platform deployment spec
+# Deploy with: doctl apps create --spec .do/app.yaml
+# Or import via: https://cloud.digitalocean.com/apps/new
+#
+# Before deploying:
+#   1. Push this repo to GitHub
+#   2. Replace YOUR_GITHUB_USERNAME and YOUR_REPO_NAME below
+#   3. Set all SECRET env vars in the DO dashboard (DATABASE_URL, REDIS_URL, etc.)
+#      DATABASE_URL → the existing transitdb cluster connection string
+#      REDIS_URL    → the Azure Redis connection string (rediss://...)
+#
+# This spec references the EXISTING managed databases — it does NOT
+# provision new ones. Attach the existing "nairobi-transit-db" cluster
+# via the DO dashboard after creating the app.
+#
+# Region: fra (Frankfurt) — closest major region to Nairobi
+
+name: nairobi-transit
+region: fra
+
+services:
+  # ── Rust/Axum API ─────────────────────────────────────────────
+  - name: api
+    dockerfile_path: server/Dockerfile
+    source_dir: /server
+    github:
+      repo: lawravasco2207/nairobi-transit
+      branch: main
+      deploy_on_push: true
+    http_port: 8080
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 30
+      period_seconds: 30
+    envs:
+      # ── Set these as SECRETS in the DO dashboard ───────────────
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        type: SECRET
+      - key: REDIS_URL
+        scope: RUN_TIME
+        type: SECRET
+      - key: DARAJA_CONSUMER_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: DARAJA_CONSUMER_SECRET
+        scope: RUN_TIME
+        type: SECRET
+      - key: DARAJA_SHORTCODE
+        scope: RUN_TIME
+        type: SECRET
+      - key: DARAJA_PASSKEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: AT_USERNAME
+        scope: RUN_TIME
+        type: SECRET
+      - key: AT_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+      # ── Computed from the app domain (no secret needed) ────────
+      - key: QR_BASE_URL
+        scope: RUN_TIME
+        value: https://nairobi-transit.ondigitalocean.app
+      - key: CALLBACK_URL
+        scope: RUN_TIME
+        value: https://nairobi-transit.ondigitalocean.app/api/payments/webhook
+
+  # ── Next.js frontend ──────────────────────────────────────────
+  - name: web
+    dockerfile_path: frontend/Dockerfile
+    source_dir: /frontend
+    github:
+      repo: lawravasco2207/nairobi-transit
+      branch: main
+      deploy_on_push: true
+    http_port: 3000
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    build_command: ""   # Dockerfile handles the build
+    envs:
+      # Baked into the Next.js bundle at build time
+      - key: NEXT_PUBLIC_API_URL
+        scope: BUILD_TIME
+        value: ${api.PUBLIC_URL}
+
+# Note: No databases section — the existing DO PostgreSQL cluster
+# (nairobi-transit-db) and Azure Redis are referenced via SECRET env vars.
+# To attach the existing cluster in the DO dashboard:
+#   Apps → your app → Settings → App-Level Environment Variables
+#   Paste the full pg connection string as DATABASE_URL (type: Secret)

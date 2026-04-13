@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nairobi Transit — Cashless Matatu Payments</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ── Header ──────────────────────────────────────────────── -->
+  <header class="header">
+    <div class="header__logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M8 6v6m0 0v6m0-6h8M3 12h2m14 0h2M12 3v2m0 14v2"/>
+      </svg>
+      Nairobi Transit
+    </div>
+    <nav class="header__nav">
+      <a href="#" class="active" data-page="passenger">Pay</a>
+      <a href="#" data-page="ussd">USSD</a>
+      <a href="#" data-page="conductor">Conductor</a>
+      <a href="#" data-page="register">Register</a>
+    </nav>
+  </header>
+
+  <!-- ================================================================
+       PAGE 1: PASSENGER PAYMENT (Smartphone QR Scan Flow)
+       ================================================================ -->
+  <div id="page-passenger" class="page active">
+    <div class="container">
+
+      <h1 class="section-title">Pay Your Fare</h1>
+      <p class="section-subtitle">Scan the QR code on the matatu or enter the vehicle code</p>
+
+      <!-- Step 1: Enter vehicle code -->
+      <div id="pay-step1" class="card">
+        <div class="card__title">Vehicle Code</div>
+        <div class="card__subtitle">Found on the sticker inside the matatu</div>
+        <div class="form-group">
+          <input type="text" id="vehicle-code" placeholder="e.g. NRB23" maxlength="10"
+                 style="text-transform: uppercase; font-size: 20px; text-align: center; letter-spacing: 3px; font-weight: 700;">
+        </div>
+        <button class="btn btn--primary" id="btn-lookup" onclick="lookupTrip()">
+          Find Trip
+        </button>
+      </div>
+
+      <!-- Step 2: Trip info + phone entry -->
+      <div id="pay-step2" class="card" style="display:none;">
+        <div class="trip-info" id="trip-info-display"></div>
+
+        <div class="fare-badge">
+          <span class="fare-badge__currency">KES</span>
+          <span class="fare-badge__amount" id="fare-amount">—</span>
+        </div>
+
+        <div class="form-group">
+          <label>Your Safaricom Number</label>
+          <input type="tel" id="phone-number" placeholder="0712 345 678" maxlength="13">
+        </div>
+
+        <button class="btn btn--primary" id="btn-pay" onclick="initiatePayment()">
+          Pay Now
+        </button>
+
+        <button class="btn btn--secondary" style="margin-top: 8px" onclick="resetPayFlow()">
+          ← Change Vehicle
+        </button>
+      </div>
+
+      <!-- Step 3: Waiting for M-Pesa -->
+      <div id="pay-step3" class="card" style="display:none;">
+        <div style="text-align:center; padding: 20px 0;">
+          <div style="font-size: 48px; margin-bottom: 16px;">📱</div>
+          <h3 style="margin-bottom: 8px;">Check Your Phone</h3>
+          <p style="color: var(--gray-500); margin-bottom: 20px;">
+            Enter your M-Pesa PIN when prompted.<br>Do not close this page.
+          </p>
+          <div class="alert alert--info">
+            <span class="status-dot status-dot--live"></span>
+            Waiting for payment confirmation…
+          </div>
+          <p id="pay-ref" style="font-size: 12px; color: var(--gray-400); margin-top: 8px;"></p>
+        </div>
+      </div>
+
+      <!-- Step 4: Success -->
+      <div id="pay-step4" class="card" style="display:none;">
+        <div style="text-align:center; padding: 20px 0;">
+          <div style="font-size: 56px; margin-bottom: 12px;">✅</div>
+          <h3 style="color: var(--green-dark); margin-bottom: 8px;">Fare Paid!</h3>
+          <p style="color: var(--gray-500); margin-bottom: 16px;">
+            Your receipt has been sent via SMS.
+          </p>
+          <div id="receipt-details" class="trip-info" style="text-align:left"></div>
+          <button class="btn btn--secondary" style="margin-top: 20px" onclick="resetPayFlow()">
+            Done
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================================================================
+       PAGE 2: USSD SIMULATOR (Feature Phone Experience)
+       ================================================================ -->
+  <div id="page-ussd" class="page">
+    <div class="container">
+
+      <h1 class="section-title">USSD Experience</h1>
+      <p class="section-subtitle">See how feature phone passengers pay — no internet needed</p>
+
+      <div class="card" style="padding:0; overflow:hidden;">
+        <!-- Phone frame -->
+        <div style="background: #333; padding: 12px 16px; display:flex; justify-content:space-between; align-items:center;">
+          <span style="color:#aaa; font-size:12px;">Safaricom 📶</span>
+          <span style="color:#aaa; font-size:12px;">3:42 PM</span>
+        </div>
+
+        <div class="ussd-screen" id="ussd-screen">Dial a USSD code to begin.
+
+Example: *384*NRB23#</div>
+
+        <div style="padding: 12px 16px; background: #111;">
+          <div class="ussd-input-row">
+            <input type="text" id="ussd-input" placeholder="*384*NRB23#" onkeydown="if(event.key==='Enter')sendUssd()">
+            <button onclick="sendUssd()">Send</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 16px;">
+        <div class="card__title">How it works</div>
+        <div class="card__subtitle">Any GSM phone, any network — no data needed</div>
+        <div class="trip-info">
+          <div class="trip-info__row">
+            <span class="trip-info__label">Step 1</span>
+            <span class="trip-info__value">Dial *384*NRB23#</span>
+          </div>
+          <div class="trip-info__row">
+            <span class="trip-info__label">Step 2</span>
+            <span class="trip-info__value">See route & fare → Press 1</span>
+          </div>
+          <div class="trip-info__row">
+            <span class="trip-info__label">Step 3</span>
+            <span class="trip-info__value">Enter phone → Confirm (1)</span>
+          </div>
+          <div class="trip-info__row">
+            <span class="trip-info__label">Step 4</span>
+            <span class="trip-info__value">Enter M-Pesa PIN on phone</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================================================================
+       PAGE 3: CONDUCTOR DASHBOARD
+       ================================================================ -->
+  <div id="page-conductor" class="page">
+    <div class="container container--wide">
+
+      <h1 class="section-title">Conductor Dashboard</h1>
+      <p class="section-subtitle">Set your trip and watch payments come in live</p>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="set-trip">Set Trip</button>
+        <button class="tab" data-tab="live-feed">Live Payments</button>
+        <button class="tab" data-tab="qr-view">QR Code</button>
+      </div>
+
+      <!-- Tab: Set Trip -->
+      <div id="tab-set-trip" class="card tab-content">
+        <div class="card__title">Start / Update Trip</div>
+        <div class="card__subtitle">Passengers will see this info before paying</div>
+
+        <div class="form-group">
+          <label>Your Phone Number</label>
+          <input type="tel" id="trip-phone" placeholder="+254712345678">
+        </div>
+        <div class="form-group">
+          <label>PIN</label>
+          <input type="password" id="trip-pin" placeholder="4-digit PIN" maxlength="8" inputmode="numeric">
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="form-group">
+          <label>Route</label>
+          <input type="text" id="trip-route" placeholder="e.g. CBD → Kasarani">
+        </div>
+        <div class="form-group">
+          <label>Destination</label>
+          <input type="text" id="trip-dest" placeholder="e.g. Kasarani Stage">
+        </div>
+        <div class="form-group">
+          <label>Fare (KES)</label>
+          <input type="number" id="trip-fare" placeholder="60" min="1" max="1000">
+        </div>
+
+        <button class="btn btn--primary" id="btn-set-trip" onclick="setTrip()">
+          Set Trip
+        </button>
+
+        <div id="trip-result" style="margin-top: 16px; display:none;"></div>
+      </div>
+
+      <!-- Tab: Live Payment Feed -->
+      <div id="tab-live-feed" class="tab-content" style="display:none;">
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div>
+              <div class="card__title">
+                <span class="status-dot status-dot--live" id="ws-dot"></span>
+                Payment Feed
+              </div>
+              <div class="card__subtitle" id="ws-status">Connecting…</div>
+            </div>
+            <div>
+              <span style="font-size: 24px; font-weight: 800; color: var(--green-dark);" id="total-collected">KES 0</span>
+            </div>
+          </div>
+
+          <div class="payment-feed" id="payment-feed">
+            <div class="empty-state">
+              <div class="empty-state__icon">📡</div>
+              <div class="empty-state__text">Waiting for payments…<br>They'll appear here instantly.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: QR Code -->
+      <div id="tab-qr-view" class="tab-content" style="display:none;">
+        <div class="card">
+          <div class="card__title">Vehicle QR Code</div>
+          <div class="card__subtitle">Print this and stick inside the matatu</div>
+
+          <div class="form-group">
+            <input type="text" id="qr-vehicle-code" placeholder="Vehicle Code (e.g. NRB23)">
+          </div>
+          <button class="btn btn--outline btn--sm" onclick="loadQR()" style="margin-bottom:20px;">
+            Generate QR
+          </button>
+
+          <div id="qr-container" class="qr-display" style="display:none;">
+            <img id="qr-img" src="" alt="QR Code">
+            <div class="qr-display__code" id="qr-ussd-code"></div>
+            <div style="font-size:12px; color:var(--gray-500); margin-top:8px;" id="qr-route-info"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================================================================
+       PAGE 4: REGISTRATION (Vehicle + Conductor)
+       ================================================================ -->
+  <div id="page-register" class="page">
+    <div class="container">
+
+      <h1 class="section-title">Join the Platform</h1>
+      <p class="section-subtitle">Register your matatu and conductor to start accepting cashless fares</p>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="reg-vehicle">Vehicle</button>
+        <button class="tab" data-tab="reg-conductor">Conductor</button>
+      </div>
+
+      <!-- Tab: Register Vehicle -->
+      <div id="tab-reg-vehicle" class="card tab-content">
+        <div class="card__title">Register Matatu</div>
+        <div class="card__subtitle">One-time setup per vehicle — you'll get a USSD code and QR link</div>
+
+        <div class="form-group">
+          <label>Number Plate</label>
+          <input type="text" id="reg-plate" placeholder="e.g. KDA 123A" style="text-transform:uppercase">
+        </div>
+        <div class="form-group">
+          <label>Vehicle Code</label>
+          <input type="text" id="reg-short-id" placeholder="e.g. NRB23 (unique short ID)" maxlength="10" style="text-transform:uppercase; letter-spacing:2px; font-weight:600">
+        </div>
+        <div class="form-group">
+          <label>SACCO Name</label>
+          <input type="text" id="reg-sacco" placeholder="e.g. City Hoppa SACCO">
+        </div>
+        <div class="form-group">
+          <label>SACCO Paybill Number</label>
+          <input type="text" id="reg-paybill" placeholder="e.g. 123456">
+        </div>
+
+        <button class="btn btn--primary" id="btn-reg-vehicle" onclick="registerVehicle()">
+          Register Vehicle
+        </button>
+
+        <div id="reg-vehicle-result" style="margin-top:16px; display:none;"></div>
+      </div>
+
+      <!-- Tab: Register Conductor -->
+      <div id="tab-reg-conductor" class="card tab-content" style="display:none;">
+        <div class="card__title">Register Conductor</div>
+        <div class="card__subtitle">Link yourself to a registered vehicle to start managing trips</div>
+
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="reg-name" placeholder="e.g. John Kamau">
+        </div>
+        <div class="form-group">
+          <label>Phone Number</label>
+          <input type="tel" id="reg-phone" placeholder="+254712345678">
+        </div>
+        <div class="form-group">
+          <label>Vehicle Code</label>
+          <input type="text" id="reg-vehicle-code" placeholder="e.g. NRB23" maxlength="10" style="text-transform:uppercase; letter-spacing:2px; font-weight:600">
+        </div>
+        <div class="form-group">
+          <label>PIN (4+ digits)</label>
+          <input type="password" id="reg-pin" placeholder="Enter a secure PIN" maxlength="8" inputmode="numeric">
+        </div>
+
+        <button class="btn btn--primary" id="btn-reg-conductor" onclick="registerConductor()">
+          Register Conductor
+        </button>
+
+        <div id="reg-conductor-result" style="margin-top:16px; display:none;"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="js/api.js?v=5"></script>
+  <script src="js/app.js?v=5"></script>
+</body>
+</html>
