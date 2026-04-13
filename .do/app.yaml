@@ -91,3 +91,23 @@ services:
 # To attach the existing cluster in the DO dashboard:
 #   Apps → your app → Settings → App-Level Environment Variables
 #   Paste the full pg connection string as DATABASE_URL (type: Secret)
+
+ingress:
+  rules:
+    # All /api/* and /health traffic → Rust API
+    - component:
+        name: api
+      match:
+        path:
+          prefix: /api
+    - component:
+        name: api
+      match:
+        path:
+          prefix: /health
+    # Everything else → Next.js frontend
+    - component:
+        name: web
+      match:
+        path:
+          prefix: /
