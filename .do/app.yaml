@@ -60,7 +60,13 @@ services:
       - key: AT_API_KEY
         scope: RUN_TIME
         type: SECRET
+      - key: JWT_SECRET
+        scope: RUN_TIME
+        type: SECRET
       # ── Computed from the app domain (no secret needed) ────────
+      - key: DARAJA_BASE_URL
+        scope: RUN_TIME
+        value: https://sandbox.safaricom.co.ke
       - key: QR_BASE_URL
         scope: RUN_TIME
         value: https://nairobi-transit-ainty.ondigitalocean.app
