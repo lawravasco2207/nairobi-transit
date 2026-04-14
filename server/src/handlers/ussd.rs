@@ -135,11 +135,18 @@ async fn process_ussd(state: &AppState, req: &UssdRequest) -> Result<String, App
             )
             .await?;
 
+        // In sandbox mode, mask the phone number stored in the database
+        let stored_phone = if state.config.is_sandbox() {
+            crate::handlers::stk::mask_phone_pub(&phone)
+        } else {
+            phone.clone()
+        };
+
         // Record pending payment
         crate::db::payments::create_pending_payment(
             &state.db,
             session.trip_id,
-            &phone,
+            &stored_phone,
             session.fare_kes * 100,
             "ussd",
             Some(&stk_resp.checkout_request_id),

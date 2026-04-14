@@ -70,11 +70,19 @@ pub async fn initiate_stk_payment(
         )
         .await?;
 
+    // In sandbox mode, mask the phone number so real numbers aren't stored
+    // in the database for a demo that can't process real payments.
+    let stored_phone = if state.config.is_sandbox() {
+        mask_phone(&phone)
+    } else {
+        phone.clone()
+    };
+
     // Record the pending payment
     let payment = payments::create_pending_payment(
         &state.db,
         trip.trip_id,
-        &phone,
+        &stored_phone,
         trip.fare_kes * 100, // store in cents
         "stk",
         Some(&stk_resp.checkout_request_id),
@@ -82,12 +90,21 @@ pub async fn initiate_stk_payment(
     )
     .await?;
 
-    Ok(Json(InitiatePaymentResponse {
-        success: true,
-        message: format!(
+    let message = if state.config.is_sandbox() {
+        format!(
+            "Demo mode: payment of Ksh {} for {} has been simulated. No real M-Pesa prompt will arrive.",
+            trip.fare_kes, trip.destination
+        )
+    } else {
+        format!(
             "Check your phone — enter M-Pesa PIN to pay Ksh {} for {}",
             trip.fare_kes, trip.destination
-        ),
+        )
+    };
+
+    Ok(Json(InitiatePaymentResponse {
+        success: true,
+        message,
         payment_id: payment.id,
     }))
 }
@@ -108,4 +125,20 @@ fn normalize_phone(phone: &str) -> Result<String, AppError> {
 /// Public version for USSD handler to reuse phone normalisation.
 pub fn normalize_phone_pub(phone: &str) -> Result<String, AppError> {
     normalize_phone(phone)
+}
+
+/// Mask a phone number for sandbox storage: "254712345678" → "2547XXXX5678"
+fn mask_phone(phone: &str) -> String {
+    if phone.len() >= 8 {
+        let prefix = &phone[..4];
+        let suffix = &phone[phone.len() - 4..];
+        format!("{}XXXX{}", prefix, suffix)
+    } else {
+        "XXXX".to_string()
+    }
+}
+
+/// Public version for USSD handler to reuse phone masking.
+pub fn mask_phone_pub(phone: &str) -> String {
+    mask_phone(phone)
 }

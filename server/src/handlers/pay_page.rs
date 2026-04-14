@@ -33,6 +33,12 @@ pub async fn pay_page(
     let fare_kes = trip.fare_kes;
     let ussd_code = format!("*384*{}#", vehicle_short_id);
 
+    let sandbox_banner = if state.config.is_sandbox() {
+        r#"<div style="background:#FFF3CD;color:#856404;padding:10px 16px;font-size:13px;text-align:center;border-bottom:1px solid #FFEEBA">⚠️ Demo mode — no real money will be charged. Payments are simulated.</div>"#
+    } else {
+        ""
+    };
+
     let html = format!(
         r##"<!DOCTYPE html>
 <html lang="en">
@@ -74,6 +80,7 @@ pub async fn pay_page(
 </style>
 </head>
 <body>
+{sandbox_banner}
 <div class="card">
   <div class="header">
     <h1>Nairobi Transit</h1>
@@ -115,7 +122,7 @@ async function pay() {{
     const data = await res.json();
     if (res.ok) {{
       msg.className = 'msg ok';
-      msg.textContent = 'Check your phone for the M-Pesa prompt!';
+      msg.textContent = data.message || 'Check your phone for the M-Pesa prompt!';
     }} else {{
       msg.className = 'msg err';
       msg.textContent = data.error || 'Payment failed. Try again.';
@@ -135,6 +142,7 @@ async function pay() {{
         destination = html_escape(&trip.destination),
         fare_kes = fare_kes,
         ussd_code = ussd_code,
+        sandbox_banner = sandbox_banner,
     );
 
     ([(header::CONTENT_TYPE, "text/html; charset=utf-8")], html).into_response()

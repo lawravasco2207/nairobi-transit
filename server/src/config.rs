@@ -48,4 +48,9 @@ impl Config {
             qr_base_url: std::env::var("QR_BASE_URL").expect("QR_BASE_URL required"),
         }
     }
+
+    /// True when running against Safaricom's sandbox (not production).
+    pub fn is_sandbox(&self) -> bool {
+        self.daraja_base_url.contains("sandbox")
+    }
 }

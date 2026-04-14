@@ -108,7 +108,9 @@ impl DarajaService {
     }
 
     /// Initiate an STK Push to the passenger's phone.
-    /// On success Safaricom pops the M-Pesa PIN prompt on the phone.
+    /// In sandbox mode, returns a simulated success immediately so demo
+    /// users aren't left waiting for a prompt that never arrives on their
+    /// real handset.
     pub async fn stk_push(
         &self,
         phone: &str,       // "254712345678"
@@ -117,6 +119,16 @@ impl DarajaService {
         description: &str,
         account_ref: &str,
     ) -> Result<StkPushResponse> {
+        if self.config.is_sandbox() {
+            let fake_id = format!("ws_CO_DEMO_{}", Utc::now().format("%Y%m%d%H%M%S"));
+            tracing::info!(phone = %phone, amount = amount_kes, "Sandbox mode: simulating STK push (no real prompt sent)");
+            return Ok(StkPushResponse {
+                checkout_request_id: fake_id,
+                response_code: "0".to_string(),
+                response_description: "Sandbox: simulated success".to_string(),
+            });
+        }
+
         let token = self.get_access_token().await?;
         let timestamp = Utc::now().format("%Y%m%d%H%M%S").to_string();
         let password = self.generate_password(&timestamp);

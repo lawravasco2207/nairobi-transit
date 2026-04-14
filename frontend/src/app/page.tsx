@@ -56,6 +56,11 @@ export default function PayPage() {
 
   return (
     <div className="max-w-md mx-auto px-4 py-5">
+      {/* Sandbox / demo notice */}
+      <div className="bg-amber-50 text-amber-800 border border-amber-200 rounded-lg px-4 py-3 text-xs mb-4">
+        <strong>Demo mode.</strong> This app runs on Safaricom&apos;s sandbox. No real money is charged and no M-Pesa prompt will reach your phone. Payments are simulated.
+      </div>
+
       <h1 className="text-xl font-bold mb-1">Pay Your Fare</h1>
       <p className="text-sm text-gray-500 mb-5">
         Scan the QR code on the matatu or enter the vehicle code
@@ -161,11 +166,11 @@ export default function PayPage() {
       {step === 3 && (
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200 text-center">
           <div className="text-5xl mb-4">📱</div>
-          <h3 className="text-lg font-bold mb-2">Check Your Phone</h3>
+          <h3 className="text-lg font-bold mb-2">Payment Processing</h3>
           <p className="text-sm text-gray-500 mb-4">
-            Enter your M-Pesa PIN when prompted.
+            Demo mode: simulating payment confirmation.
             <br />
-            Do not close this page.
+            In production, you&apos;d enter your M-Pesa PIN here.
           </p>
           <div className="bg-blue-50 text-blue-800 border border-blue-300 rounded-lg px-4 py-3 text-sm inline-flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-transit-green animate-pulse" />
