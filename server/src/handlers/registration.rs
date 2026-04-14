@@ -6,6 +6,7 @@ use crate::{
     db::vehicles::{insert_conductor, insert_vehicle},
     domain::vehicle::{RegisterConductorRequest, RegisterVehicleRequest},
     error::AppError,
+    services::vehicle_code::generate_vehicle_short_id,
     AppState,
 };
 
@@ -26,22 +27,41 @@ pub async fn register_vehicle(
     State(state): State<AppState>,
     Json(req): Json<RegisterVehicleRequest>,
 ) -> Result<Json<RegisterVehicleResponse>, AppError> {
-    if req.plate.is_empty() || req.short_id.is_empty() || req.sacco_name.is_empty() || req.paybill_no.is_empty() {
+    let plate = req.plate.trim().to_uppercase();
+    let sacco_name = req.sacco_name.trim().to_string();
+    let paybill_no = req.paybill_no.trim().to_string();
+    let legacy_short_id = req.short_id.as_deref().map(str::trim).filter(|value| !value.is_empty());
+
+    if plate.is_empty() || sacco_name.is_empty() || paybill_no.is_empty() {
         return Err(AppError::BadRequest("All fields are required".into()));
     }
 
-    let vehicle = insert_vehicle(&state.db, &req.plate, &req.short_id, &req.sacco_name, &req.paybill_no)
-        .await
-        .map_err(|e| {
-            if e.to_string().contains("duplicate key") {
-                AppError::BadRequest(format!(
-                    "Vehicle with plate '{}' or short_id '{}' already exists",
-                    req.plate, req.short_id
-                ))
-            } else {
-                AppError::Internal(e)
+    if let Some(short_id) = legacy_short_id {
+        tracing::debug!(supplied_short_id = %short_id, "Ignoring client-supplied vehicle code during registration");
+    }
+
+    let vehicle = loop {
+        let short_id = generate_vehicle_short_id(&state.db, &plate, &sacco_name)
+            .await
+            .map_err(AppError::Internal)?;
+
+        match insert_vehicle(&state.db, &plate, &short_id, &sacco_name, &paybill_no).await {
+            Ok(vehicle) => break vehicle,
+            Err(e) => {
+                let message = e.to_string();
+                if message.contains("vehicles_plate_key") || message.contains("duplicate key") && message.contains("plate") {
+                    return Err(AppError::BadRequest(format!(
+                        "Vehicle with plate '{}' already exists",
+                        plate
+                    )));
+                }
+                if message.contains("vehicles_short_id_key") || message.contains("duplicate key") && message.contains("short_id") {
+                    continue;
+                }
+                return Err(AppError::Internal(e));
             }
-        })?;
+        }
+    };
 
     tracing::info!(
         vehicle_id = %vehicle.id,

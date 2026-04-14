@@ -261,14 +261,14 @@ POST https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest
 
 USSD (Unstructured Supplementary Service Data) lets passengers interact with the payment system using any GSM phone — no internet, no app, no smartphone required.
 
-**USSD code:** `*384*[VehicleCode]#` (e.g. `*384*NRB23#`)
+**USSD code:** `*384*[VehicleCode]#` (e.g. `*384*NCH23#`)
 
 ### Session Flow
 
 ```
-Dial *384*NRB23#
+Dial *384*NCH23#
   │
-  ├─► CON "NRB23 — CBD → Kasarani
+  ├─► CON "NCH23 — CBD → Kasarani
   │         Fare: KES 60
   │         1. Pay now
   │         2. Cancel"
@@ -288,7 +288,7 @@ Each USSD session (identified by `sessionId` from Africa's Talking) stores:
 ```json
 {
   "step": 2,
-  "vehicle_code": "NRB23",
+  "vehicle_code": "NCH23",
   "trip_id": "uuid",
   "fare_kes": 60,
   "phase": "awaiting_phone"
@@ -307,7 +307,7 @@ Seven migrations run automatically on server startup.
 **vehicles**
 ```sql
 id           UUID PRIMARY KEY
-short_id     TEXT UNIQUE          -- e.g. "NRB23"
+short_id     TEXT UNIQUE          -- e.g. "NCH23"
 plate_number TEXT
 sacco_name   TEXT
 paybill      TEXT
@@ -434,7 +434,7 @@ alias     TEXT
 Passenger scans QR code on matatu seat
   │
   ▼
-Frontend loads /api/qr/NRB23
+Frontend loads /api/qr/NCH23
 → displays route "CBD → Kasarani", fare KES 60
   │
   ▼
@@ -444,7 +444,7 @@ Passenger enters their phone number, taps Pay
 Frontend: POST /api/pay/qr { vehicle_short_id, phone }
   │
   ▼
-Backend: fetches active trip for NRB23
+Backend: fetches active trip for NCH23
          creates payment record (status=pending)
          calls Daraja STK Push
   │
@@ -470,13 +470,13 @@ Conductor dashboard: displays "KES 60 received from 0712... — QHX7ABC123"
 ### Flow B: Feature Phone Passenger (USSD)
 
 ```
-Passenger dials *384*NRB23#
+Passenger dials *384*NCH23#
   │
   ▼
 Africa's Talking: POST /api/ussd { sessionId, serviceCode, text="", phoneNumber }
   │
   ▼
-Backend: step 0 — fetches trip for NRB23
+Backend: step 0 — fetches trip for NCH23
   - stores session in Redis
   - responds: CON "CBD → Kasarani | KES 60\n1. Pay\n2. Cancel"
   │

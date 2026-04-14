@@ -14,7 +14,7 @@ pub struct UssdRequest {
     #[serde(rename = "networkCode")]
     pub network_code: String,
     #[serde(rename = "serviceCode")]
-    pub service_code: String, // e.g. "*384*NRB23#"
+    pub service_code: String, // e.g. "*384*NCH23#"
     pub text: String,         // accumulates: "" → "1" → "1*0712345678" → "1*0712345678*1"
 }
 
@@ -167,7 +167,7 @@ async fn process_ussd(state: &AppState, req: &UssdRequest) -> Result<String, App
 }
 
 /// Extract vehicle short_id from USSD service code.
-/// "*384*NRB23#" → "NRB23"
+/// "*384*NCH23#" → "NCH23"
 fn extract_vehicle_id(service_code: &str) -> Option<&str> {
     let inner = service_code.trim_start_matches('*').trim_end_matches('#');
     let parts: Vec<&str> = inner.split('*').collect();

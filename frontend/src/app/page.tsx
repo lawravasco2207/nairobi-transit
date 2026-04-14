@@ -108,7 +108,7 @@ export default function PayPage() {
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
             onKeyDown={(e) => e.key === "Enter" && lookupTrip()}
-            placeholder="e.g. NBC43"
+            placeholder="e.g. NCH23"
             maxLength={10}
             className="w-full px-3 py-3 border border-gray-200 rounded-lg text-xl text-center font-bold tracking-widest uppercase focus:outline-none focus:border-transit-green focus:ring-2 focus:ring-transit-green/20"
           />

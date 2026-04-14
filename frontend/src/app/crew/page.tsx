@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { api, EnvStatus } from "@/lib/api";
+import { api, RegisterResult } from "@/lib/api";
 
 /* ── Shared types ─────────────────────────────────────── */
 interface PaymentEvent {
@@ -24,7 +24,7 @@ interface ActiveTrip {
 }
 
 /* ── Top-level tabs ───────────────────────────────────── */
-type CrewTab = "trip" | "fare" | "payments" | "qr" | "gps" | "register" | "settings";
+type CrewTab = "trip" | "fare" | "payments" | "qr" | "gps" | "register";
 
 const TAB_LABELS: Record<CrewTab, string> = {
   trip: "Set Trip",
@@ -33,7 +33,6 @@ const TAB_LABELS: Record<CrewTab, string> = {
   qr: "QR Code",
   gps: "GPS",
   register: "Register",
-  settings: "Settings",
 };
 
 /* ════════════════════════════════════════════════════════
@@ -95,7 +94,6 @@ export default function CrewPage() {
         <GpsTab phone={activeTrip?.phone ?? ""} tripId={activeTrip?.tripId ?? ""} />
       )}
       {tab === "register" && <RegisterSection />}
-      {tab === "settings" && <SettingsSection />}
     </div>
   );
 }
@@ -478,7 +476,7 @@ function QrViewTab() {
         value={code}
         onChange={(e) => setCode(e.target.value.toUpperCase())}
         onKeyDown={(e) => e.key === "Enter" && loadQR()}
-        placeholder="Vehicle Code (e.g. NBC43)"
+        placeholder="Vehicle Code (e.g. NCH23)"
         className="w-full px-3 py-3 border border-gray-200 rounded-lg text-base uppercase tracking-wide font-semibold focus:outline-none focus:border-transit-green focus:ring-2 focus:ring-transit-green/20 mb-3"
       />
       <button
@@ -656,24 +654,23 @@ function RegisterSection() {
 
 function VehicleForm() {
   const [plate, setPlate] = useState("");
-  const [shortId, setShortId] = useState("");
   const [sacco, setSacco] = useState("");
   const [paybill, setPaybill] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState<{ id: string; message: string } | null>(null);
+  const [result, setResult] = useState<RegisterResult | null>(null);
 
   async function submit() {
-    if (!plate || !shortId || !sacco || !paybill) {
+    if (!plate || !sacco || !paybill) {
       setError("Please fill in all fields");
       return;
     }
     setLoading(true);
     setError("");
     try {
-      const r = await api.registerVehicle(plate.toUpperCase(), shortId.toUpperCase(), sacco, paybill);
+      const r = await api.registerVehicle(plate.toUpperCase(), sacco, paybill);
       setResult(r);
-      setPlate(""); setShortId(""); setSacco(""); setPaybill("");
+      setPlate(""); setSacco(""); setPaybill("");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Registration failed");
     } finally {
@@ -685,14 +682,24 @@ function VehicleForm() {
     <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
       <div className="font-semibold text-base mb-1">Register Matatu</div>
       <div className="text-xs text-gray-500 mb-4">
-        One-time setup per vehicle — you&apos;ll get a USSD code and QR link
+        One-time setup per vehicle — we&apos;ll assign the vehicle code and generate the USSD link for you
       </div>
 
       {error && <ErrorBox>{error}</ErrorBox>}
-      {result && <SuccessBox>✅ {result.message} — ID: <span className="font-mono text-xs">{result.id}</span></SuccessBox>}
+      {result && (
+        <div className="space-y-3 mb-4">
+          <SuccessBox>✅ {result.message} — ID: <span className="font-mono text-xs">{result.id}</span></SuccessBox>
+          <Card title="Assigned Access Codes">
+            <Row label="Vehicle Code" value={result.shortId ?? "Pending"} mono />
+            <Row label="USSD Code" value={result.ussdCode ?? "Pending"} mono />
+          </Card>
+        </div>
+      )}
 
       <Field label="Number Plate" value={plate} onChange={setPlate} placeholder="e.g. KDA 123A" upper />
-      <Field label="Vehicle Code" value={shortId} onChange={setShortId} placeholder="e.g. NBC43 (unique short ID)" upper maxLength={10} />
+      <div className="text-xs text-gray-500 -mt-2 mb-4">
+        Vehicle codes follow our standard format and are generated automatically from the registration details.
+      </div>
       <Field label="SACCO Name" value={sacco} onChange={setSacco} placeholder="e.g. City Hoppa SACCO" />
       <Field label="SACCO Paybill Number" value={paybill} onChange={setPaybill} placeholder="e.g. 123456" />
 
@@ -746,7 +753,7 @@ function ConductorForm() {
 
       <Field label="Full Name" value={name} onChange={setName} placeholder="e.g. John Kamau" />
       <Field label="Phone Number" value={phone} onChange={setPhone} placeholder="+254712345678" type="tel" />
-      <Field label="Vehicle Code" value={vehicleCode} onChange={setVehicleCode} placeholder="e.g. NBC43" upper maxLength={10} />
+      <Field label="Vehicle Code" value={vehicleCode} onChange={setVehicleCode} placeholder="e.g. NCH23" upper maxLength={10} />
       <Field label="PIN (4+ digits)" value={pin} onChange={setPin} placeholder="Enter a secure PIN" type="password" maxLength={8} />
 
       <button
@@ -756,83 +763,6 @@ function ConductorForm() {
       >
         {loading ? "Registering..." : "Register Conductor"}
       </button>
-    </div>
-  );
-}
-
-/* ════════════════════════════════════════════════════════
-   Settings
-════════════════════════════════════════════════════════ */
-function SettingsSection() {
-  const [status, setStatus] = useState<EnvStatus | null>(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api
-      .getEnvStatus()
-      .then(setStatus)
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load settings"))
-      .finally(() => setLoading(false));
-  }, []);
-
-  function refresh() {
-    setLoading(true);
-    setError("");
-    api
-      .getEnvStatus()
-      .then(setStatus)
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed"))
-      .finally(() => setLoading(false));
-  }
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <div className="font-semibold text-base">Environment &amp; Settings</div>
-          <div className="text-xs text-gray-500 mt-0.5">Server configuration and service connection status</div>
-        </div>
-        <button
-          onClick={refresh}
-          disabled={loading}
-          className="text-sm text-transit-green font-semibold hover:underline disabled:text-gray-400"
-        >
-          {loading ? "Loading..." : "Refresh"}
-        </button>
-      </div>
-
-      {error && <ErrorBox>{error}</ErrorBox>}
-
-      {loading && !status && (
-        <div className="text-center py-16 text-gray-400">
-          <div className="text-3xl mb-2">⏳</div>
-          <div className="text-sm">Connecting to server...</div>
-        </div>
-      )}
-
-      {status && (
-        <div className="space-y-4">
-          <Card title="Server">
-            <Row label="Host" value={status.server.host} />
-            <Row label="Port" value={String(status.server.port)} />
-          </Card>
-
-          <Card title="Service Connections">
-            <StatusRow label="PostgreSQL Database" ok={status.database_connected} />
-            <StatusRow label="Redis Cache" ok={status.redis_connected} />
-            <StatusRow label="Daraja (M-Pesa)" ok={status.daraja_configured} />
-            <StatusRow label="Africa's Talking" ok={status.at_configured} />
-          </Card>
-
-          <Card title="Frontend Configuration">
-            <Row
-              label="API endpoint"
-              value={process.env.NEXT_PUBLIC_API_URL || "(default — same origin)"}
-            />
-          </Card>
-        </div>
-      )}
     </div>
   );
 }
@@ -902,18 +832,6 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
     <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
       <div className="font-semibold text-base mb-3">{title}</div>
       <div className="space-y-3">{children}</div>
-    </div>
-  );
-}
-
-function StatusRow({ label, ok }: { label: string; ok: boolean }) {
-  return (
-    <div className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
-      <span className="text-xs text-gray-500 font-medium">{label}</span>
-      <span className={`inline-flex items-center gap-1.5 text-sm font-semibold ${ok ? "text-transit-green" : "text-red-500"}`}>
-        <span className={`w-2 h-2 rounded-full ${ok ? "bg-transit-green" : "bg-red-500"}`} />
-        {ok ? "Connected" : "Not configured"}
-      </span>
     </div>
   );
 }

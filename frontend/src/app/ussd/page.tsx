@@ -4,14 +4,14 @@ import { useState } from "react";
 
 export default function UssdPage() {
   const [step, setStep] = useState(0);
-  const [screen, setScreen] = useState("Dial a USSD code to begin.\n\nExample: *384*NBC43#");
+  const [screen, setScreen] = useState("Dial a USSD code to begin.\n\nExample: *384*NCH23#");
   const [input, setInput] = useState("");
-  const [placeholder, setPlaceholder] = useState("*384*NBC43#");
+  const [placeholder, setPlaceholder] = useState("*384*NCH23#");
 
   function reset() {
     setStep(0);
     setInput("");
-    setPlaceholder("*384*NBC43#");
+    setPlaceholder("*384*NCH23#");
   }
 
   function send() {
@@ -22,7 +22,7 @@ export default function UssdPage() {
     if (step === 0 && val.startsWith("*") && val.endsWith("#")) {
       const match = val.match(/\*384\*(\w+)#/);
       if (!match) {
-        setScreen("Invalid code. Try *384*NBC43#");
+        setScreen("Invalid code. Try *384*NCH23#");
         setInput("");
         return;
       }
@@ -128,7 +128,7 @@ export default function UssdPage() {
           Any GSM phone, any network &mdash; no data needed
         </div>
         <div className="space-y-3">
-          <Row label="Step 1" value="Dial *384*NBC43#" />
+          <Row label="Step 1" value="Dial *384*NCH23#" />
           <Row label="Step 2" value="See route & fare → Press 1" />
           <Row label="Step 3" value="Enter phone → Confirm (1)" />
           <Row label="Step 4" value="Enter M-Pesa PIN on phone" />

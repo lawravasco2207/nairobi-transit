@@ -17,6 +17,17 @@ pub async fn get_vehicle_by_short_id(pool: &PgPool, short_id: &str) -> Result<Op
     Ok(vehicle)
 }
 
+pub async fn short_id_exists(pool: &PgPool, short_id: &str) -> Result<bool> {
+    let exists = sqlx::query_scalar::<_, bool>(
+        r#"SELECT EXISTS(SELECT 1 FROM vehicles WHERE short_id = $1)"#,
+    )
+    .bind(short_id)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(exists)
+}
+
 /// Register a new vehicle (matatu) in the system.
 pub async fn insert_vehicle(
     pool: &PgPool,

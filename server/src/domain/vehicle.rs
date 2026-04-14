@@ -6,7 +6,7 @@ use uuid::Uuid;
 pub struct Vehicle {
     pub id: Uuid,
     pub plate: String,
-    pub short_id: String,   // "NRB23" — used in USSD *384*NRB23#
+    pub short_id: String,   // "NCH23" — used in USSD *384*NCH23#
     pub sacco_name: String,
     pub paybill_no: String,
 }
@@ -15,7 +15,8 @@ pub struct Vehicle {
 #[derive(Debug, Deserialize)]
 pub struct RegisterVehicleRequest {
     pub plate: String,       // e.g. "KDA 123A"
-    pub short_id: String,    // e.g. "NRB23"
+    #[serde(default)]
+    pub short_id: Option<String>, // accepted for backward compatibility; server generates the real code
     pub sacco_name: String,
     pub paybill_no: String,
 }

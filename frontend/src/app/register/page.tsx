@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { api } from "@/lib/api";
+import { api, RegisterResult } from "@/lib/api";
 
 export default function RegisterPage() {
   const [tab, setTab] = useState<"vehicle" | "conductor">("vehicle");
@@ -37,25 +37,23 @@ export default function RegisterPage() {
 
 function VehicleForm() {
   const [plate, setPlate] = useState("");
-  const [shortId, setShortId] = useState("");
   const [sacco, setSacco] = useState("");
   const [paybill, setPaybill] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState<{ id: string; message: string } | null>(null);
+  const [result, setResult] = useState<RegisterResult | null>(null);
 
   async function submit() {
-    if (!plate || !shortId || !sacco || !paybill) {
+    if (!plate || !sacco || !paybill) {
       setError("Please fill in all fields");
       return;
     }
     setLoading(true);
     setError("");
     try {
-      const r = await api.registerVehicle(plate.toUpperCase(), shortId.toUpperCase(), sacco, paybill);
+      const r = await api.registerVehicle(plate.toUpperCase(), sacco, paybill);
       setResult(r);
       setPlate("");
-      setShortId("");
       setSacco("");
       setPaybill("");
     } catch (e: unknown) {
@@ -69,18 +67,24 @@ function VehicleForm() {
     <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
       <div className="font-semibold text-base mb-1">Register Matatu</div>
       <div className="text-xs text-gray-500 mb-4">
-        One-time setup per vehicle &mdash; you&apos;ll get a USSD code and QR link
+        One-time setup per vehicle &mdash; we&apos;ll generate the official vehicle code and USSD link for you
       </div>
 
       {error && <Alert type="error">{error}</Alert>}
       {result && (
-        <Alert type="success">
-          ✅ {result.message} &mdash; ID: <span className="font-mono text-xs">{result.id}</span>
-        </Alert>
+        <>
+          <Alert type="success">
+            ✅ {result.message} &mdash; ID: <span className="font-mono text-xs">{result.id}</span>
+          </Alert>
+          <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900 space-y-2">
+            <InfoRow label="Assigned vehicle code" value={result.shortId ?? "Pending"} />
+            <InfoRow label="USSD code" value={result.ussdCode ?? "Pending"} mono />
+          </div>
+        </>
       )}
 
       <Field label="Number Plate" value={plate} onChange={setPlate} placeholder="e.g. KDA 123A" upper />
-      <Field label="Vehicle Code" value={shortId} onChange={setShortId} placeholder="e.g. NBC43 (unique short ID)" upper maxLength={10} />
+      <Hint text="Vehicle code is generated automatically from the plate in our standard format." />
       <Field label="SACCO Name" value={sacco} onChange={setSacco} placeholder="e.g. City Hoppa SACCO" />
       <Field label="SACCO Paybill Number" value={paybill} onChange={setPaybill} placeholder="e.g. 123456" />
 
@@ -141,7 +145,7 @@ function ConductorForm() {
 
       <Field label="Full Name" value={name} onChange={setName} placeholder="e.g. John Kamau" />
       <Field label="Phone Number" value={phone} onChange={setPhone} placeholder="+254712345678" type="tel" />
-      <Field label="Vehicle Code" value={vehicleCode} onChange={setVehicleCode} placeholder="e.g. NBC43" upper maxLength={10} />
+      <Field label="Vehicle Code" value={vehicleCode} onChange={setVehicleCode} placeholder="e.g. NCH23" upper maxLength={10} />
       <Field label="PIN (4+ digits)" value={pin} onChange={setPin} placeholder="Enter a secure PIN" type="password" maxLength={8} />
 
       <button
@@ -198,6 +202,19 @@ function Alert({ type, children }: { type: "error" | "success"; children: React.
   return (
     <div className={`${styles} border rounded-lg px-4 py-3 text-sm mb-4`}>
       {children}
+    </div>
+  );
+}
+
+function Hint({ text }: { text: string }) {
+  return <div className="text-xs text-gray-500 -mt-2 mb-4">{text}</div>;
+}
+
+function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-xs font-semibold uppercase tracking-wide text-green-800">{label}</span>
+      <span className={mono ? "font-mono text-xs font-semibold" : "font-semibold"}>{value}</span>
     </div>
   );
 }

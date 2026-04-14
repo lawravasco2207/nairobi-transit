@@ -44,6 +44,24 @@ export interface RegisterResult {
   success: boolean;
   id: string;
   message: string;
+  shortId?: string;
+  ussdCode?: string;
+  vehicleId?: string;
+}
+
+interface VehicleRegisterResponse {
+  success: boolean;
+  vehicle_id: string;
+  short_id: string;
+  ussd_code: string;
+  message: string;
+}
+
+interface ConductorRegisterResponse {
+  success: boolean;
+  conductor_id: string;
+  vehicle_id: string;
+  message: string;
 }
 
 export interface EnvStatus {
@@ -84,13 +102,20 @@ export const api = {
     return handleResponse<SetTripResult>(res);
   },
 
-  async registerVehicle(plate: string, shortId: string, saccoName: string, paybillNo: string): Promise<RegisterResult> {
+  async registerVehicle(plate: string, saccoName: string, paybillNo: string): Promise<RegisterResult> {
     const res = await fetch(apiUrl('/api/vehicles/register'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...HEADERS },
-      body: JSON.stringify({ plate, short_id: shortId, sacco_name: saccoName, paybill_no: paybillNo }),
+      body: JSON.stringify({ plate, sacco_name: saccoName, paybill_no: paybillNo }),
     });
-    return handleResponse<RegisterResult>(res);
+    const data = await handleResponse<VehicleRegisterResponse>(res);
+    return {
+      success: data.success,
+      id: data.vehicle_id,
+      message: data.message,
+      shortId: data.short_id,
+      ussdCode: data.ussd_code,
+    };
   },
 
   async registerConductor(phone: string, name: string, vehicleShortId: string, pin: string): Promise<RegisterResult> {
@@ -99,7 +124,13 @@ export const api = {
       headers: { 'Content-Type': 'application/json', ...HEADERS },
       body: JSON.stringify({ phone, name, vehicle_short_id: vehicleShortId, pin }),
     });
-    return handleResponse<RegisterResult>(res);
+    const data = await handleResponse<ConductorRegisterResponse>(res);
+    return {
+      success: data.success,
+      id: data.conductor_id,
+      message: data.message,
+      vehicleId: data.vehicle_id,
+    };
   },
 
   async getEnvStatus(): Promise<EnvStatus> {

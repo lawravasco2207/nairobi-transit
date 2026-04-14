@@ -180,7 +180,7 @@ nairobi-transit/
 CREATE TABLE vehicles (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     plate       VARCHAR(20) UNIQUE NOT NULL,
-    short_id    VARCHAR(10) UNIQUE NOT NULL, -- e.g. "NRB23" used in USSD *384*NRB23#
+    short_id    VARCHAR(10) UNIQUE NOT NULL, -- e.g. "NCH23" used in USSD *384*NCH23#
     sacco_name  VARCHAR(100) NOT NULL,
     paybill_no  VARCHAR(20) NOT NULL,        -- SACCO's registered Daraja Paybill
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -433,7 +433,7 @@ use uuid::Uuid;
 pub struct Vehicle {
     pub id: Uuid,
     pub plate: String,
-    pub short_id: String,     // "NRB23" — used in USSD *384*NRB23#
+    pub short_id: String,     // "NCH23" — used in USSD *384*NCH23#
     pub sacco_name: String,
     pub paybill_no: String,
 }
@@ -617,7 +617,7 @@ pub struct UpdateTripPayload {
 pub struct UpdateTripResponse {
     pub success: bool,
     pub trip_id: Uuid,
-    pub ussd_code: String,  // e.g. "*384*NRB23#" — print this on the seat sticker
+    pub ussd_code: String,  // e.g. "*384*NCH23#" — print this on the seat sticker
     pub qr_url: String,     // passengers with smartphones scan this
     pub message: String,
 }
@@ -680,7 +680,7 @@ pub async fn update_trip(
 
 ### `src/services/qr_generator.rs`
 
-The QR encodes a URL like `https://yourdomain.com/pay/NRB23`. When a smartphone passenger scans it, the browser hits our API which looks up the active trip and initiates STK Push.
+The QR encodes a URL like `https://yourdomain.com/pay/NCH23`. When a smartphone passenger scans it, the browser hits our API which looks up the active trip and initiates STK Push.
 
 ```rust
 use qrcode::QrCode;
@@ -876,7 +876,7 @@ Africa's Talking sends a POST to this endpoint on every USSD menu interaction. W
 
 The flow we design:
 ```
-Passenger dials *384*NRB23#
+Passenger dials *384*NCH23#
 → "Route: CBD→Kasarani | Dest: Kasarani Stage | Fare: Ksh 60
    1. Pay now   2. Cancel"
 → Presses 1
@@ -903,7 +903,7 @@ pub struct UssdRequest {
     #[serde(rename = "networkCode")]
     pub network_code: String,
     #[serde(rename = "serviceCode")]
-    pub service_code: String,  // e.g. "*384*NRB23#"
+    pub service_code: String,  // e.g. "*384*NCH23#"
     pub text: String,          // accumulates: "" → "1" → "1*0712345678" → "1*0712345678*1"
 }
 
@@ -922,7 +922,7 @@ pub async fn handle_ussd(
 }
 
 async fn process_ussd(state: &AppState, req: &UssdRequest) -> Result<String, AppError> {
-    // Extract vehicle short_id from service code: "*384*NRB23#" → "NRB23"
+    // Extract vehicle short_id from service code: "*384*NCH23#" → "NCH23"
     let vehicle_short_id = extract_vehicle_id(&req.service_code)
         .ok_or(AppError::BadRequest("Invalid USSD code".into()))?;
 
@@ -1032,7 +1032,7 @@ async fn process_ussd(state: &AppState, req: &UssdRequest) -> Result<String, App
 }
 
 fn extract_vehicle_id(service_code: &str) -> Option<&str> {
-    // "*384*NRB23#" → "NRB23"
+    // "*384*NCH23#" → "NCH23"
     let inner = service_code.trim_start_matches('*').trim_end_matches('#');
     let parts: Vec<&str> = inner.split('*').collect();
     parts.get(1).copied()
@@ -1749,11 +1749,11 @@ RUST_LOG=info cargo run
 
 ```sql
 INSERT INTO vehicles (plate, short_id, sacco_name, paybill_no)
-VALUES ('KDA 123A', 'NRB23', 'City Hoppa SACCO', '123456');
+VALUES ('KDA 123A', 'NCH23', 'City Hoppa SACCO', '123456');
 
 INSERT INTO conductors (phone, name, vehicle_id, pin_hash)
 VALUES ('+254712345678', 'John Kamau',
-        (SELECT id FROM vehicles WHERE short_id = 'NRB23'),
+    (SELECT id FROM vehicles WHERE short_id = 'NCH23'),
         '$2b$12$...');  -- bcrypt hash of conductor's PIN
 ```
 
@@ -1779,7 +1779,7 @@ curl -X POST http://localhost:8080/api/conductor/trip \
 curl -X POST http://localhost:8080/api/pay/qr \
   -H "Content-Type: application/json" \
   -d '{
-    "vehicle_short_id": "NRB23",
+        "vehicle_short_id": "NCH23",
     "passenger_phone": "0712345678"
   }'
 
@@ -1854,7 +1854,7 @@ curl -X POST http://localhost:8080/api/daraja/callback \
 
 ```
 1. Board matatu
-2. See sticker: "Dial *384*NRB23#"
+2. See sticker: "Dial *384*NCH23#"
 3. Dial → screen shows: "CBD→Kasarani | Dest: Kasarani Stage | Fare: Ksh 60"
 4. Press 1 → enter their number → press 1 to confirm
 5. STK Push fires to their phone
@@ -1870,7 +1870,7 @@ curl -X POST http://localhost:8080/api/daraja/callback \
 2. Set route: "CBD → Kasarani"
 3. Set destination: "Kasarani Stage"
 4. Set fare: 60
-5. Save → QR auto-updates, USSD code stays same (*384*NRB23#)
+5. Save → QR auto-updates, USSD code stays same (*384*NCH23#)
 6. Watch live payment feed on screen — no chasing passengers
 ```
 

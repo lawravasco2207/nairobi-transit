@@ -21,7 +21,7 @@ Nairobi Transit is a cashless fare payment system built for Nairobi's matatu (mi
 The system connects passengers, conductors, and SACCOs through three building blocks:
 
 - **M-Pesa (STK Push):** Smartphone passengers scan a QR code on the matatu, see the route and fare, then approve the payment with their M-Pesa PIN. The conductor is notified instantly.
-- **USSD:** Feature phone passengers dial a short code (e.g. `*384*NRB23#`), see the fare, and confirm. Works on any GSM handset, no internet or app needed.
+- **USSD:** Feature phone passengers dial a short code (e.g. `*384*NCH23#`), see the fare, and confirm. Works on any GSM handset, no internet or app needed.
 - **Conductor Dashboard:** The conductor sets the current route and fare. Payments appear in real time, and every transaction goes to the SACCO Paybill, never a personal M-Pesa line.
 
 ```
@@ -47,7 +47,7 @@ The system connects passengers, conductors, and SACCOs through three building bl
 5. Done. The conductor sees your payment immediately
 
 ### Feature Phone (USSD)
-1. Dial `*384*` followed by the vehicle code shown in the matatu (e.g. `*384*NRB23#`)
+1. Dial `*384*` followed by the vehicle code shown in the matatu (e.g. `*384*NCH23#`)
 2. See the route and fare, press **1** to pay
 3. Enter your M-Pesa number
 4. Confirm the payment

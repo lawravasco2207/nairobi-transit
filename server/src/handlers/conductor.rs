@@ -23,7 +23,7 @@ pub struct UpdateTripPayload {
 pub struct UpdateTripResponse {
     pub success: bool,
     pub trip_id: Uuid,
-    pub ussd_code: String, // e.g. "*384*NRB23#"
+    pub ussd_code: String, // e.g. "*384*NCH23#"
     pub qr_url: String,
     pub message: String,
 }

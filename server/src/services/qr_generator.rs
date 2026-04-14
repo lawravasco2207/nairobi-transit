@@ -4,7 +4,7 @@ use image::Luma;
 use qrcode::QrCode;
 
 /// Generate a QR code as a base64-encoded PNG data URI.
-/// The QR encodes a URL like `https://yourdomain.com/pay/NRB23`.
+/// The QR encodes a URL like `https://yourdomain.com/pay/NCH23`.
 pub fn generate_qr_base64(vehicle_short_id: &str, base_url: &str) -> Result<String> {
     let url = format!("{}/{}", base_url, vehicle_short_id);
     let code = QrCode::new(url.as_bytes())?;
