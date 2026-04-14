@@ -83,7 +83,7 @@ export default function SettingsPage() {
           <Card title="Frontend Configuration">
             <Row
               label="NEXT_PUBLIC_API_URL"
-              value={process.env.NEXT_PUBLIC_API_URL || "(not set — using default)"}
+              value={process.env.NEXT_PUBLIC_API_URL || "(not set — same origin)"}
             />
           </Card>
         </div>

@@ -16,7 +16,11 @@
 #
 # ── Routing architecture ──────────────────────────────────────────────
 # The DO ingress routes /api/*, /pay/*, and /health directly to the Rust
-# "api" service.  Everything else goes to the Next.js "web" service.
+# "api" service. Everything else goes to the Next.js "web" service.
+#
+# App Platform trims matched path prefixes before forwarding by default. The
+# ingress rules below therefore set preserve_path_prefix: true so Axum still
+# receives /api/*, /pay/*, and /health exactly as declared in server/src/main.rs.
 #
 # Previous approach used Next.js server-side rewrites to proxy /api/**
 # to the Rust service, but Next.js rewrites() are evaluated at BUILD time
@@ -101,9 +105,9 @@ services:
     instance_size_slug: basic-xxs
     # build_command is for buildpack deployments; Dockerfile builds must omit it.
     envs:
-      # NEXT_PUBLIC_API_URL is empty so the browser uses same-origin relative
-      # URLs.  All /api/* requests then reach the Next.js server which proxies
-      # them to the Rust service via INTERNAL_API_URL (see next.config.ts).
+      # Leave NEXT_PUBLIC_API_URL empty so the browser uses same-origin
+      # relative URLs. App Platform ingress then sends /api/*, /pay/*, and
+      # /health to the Rust service directly.
       - key: NEXT_PUBLIC_API_URL
         scope: BUILD_TIME
         value: ""
@@ -132,18 +136,21 @@ ingress:
     # local development where localhost:8080 is correct.
     - component:
         name: api
+        preserve_path_prefix: true
       match:
         path:
           prefix: /api/
     # ── Passenger pay page (HTML rendered by Rust) ───────────────
     - component:
         name: api
+        preserve_path_prefix: true
       match:
         path:
           prefix: /pay/
     # ── Health check ─────────────────────────────────────────────
     - component:
         name: api
+        preserve_path_prefix: true
       match:
         path:
           prefix: /health

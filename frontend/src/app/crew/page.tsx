@@ -448,6 +448,14 @@ function QrViewTab() {
   } | null>(null);
   const [error, setError] = useState("");
 
+  function getQrLookupMessage(error: unknown): string {
+    const message = error instanceof Error ? error.message : "Failed";
+    if (message.includes("No active trip for this vehicle")) {
+      return "Vehicle found, but there is no active trip yet. Open the Trip Setup tab, start the current route, then generate the QR again.";
+    }
+    return message;
+  }
+
   async function loadQR() {
     if (!code.trim()) return;
     setError("");
@@ -455,7 +463,7 @@ function QrViewTab() {
       const data = await api.getTrip(code.trim().toUpperCase());
       setQrData(data);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed");
+      setError(getQrLookupMessage(e));
     }
   }
 

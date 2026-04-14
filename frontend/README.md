@@ -25,6 +25,10 @@ The API base URL is read from `NEXT_PUBLIC_API_URL` (defaults to `http://localho
 NEXT_PUBLIC_API_URL=http://localhost:8080
 ```
 
+If `NEXT_PUBLIC_API_URL` is unset, the frontend uses same-origin relative URLs.
+That is the correct production setup on DigitalOcean App Platform, where ingress
+routes `/api`, `/pay`, and `/health` to the Rust service.
+
 ## Build
 
 ```bash

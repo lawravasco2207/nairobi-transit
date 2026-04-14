@@ -4,6 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { api, TripInfo } from "@/lib/api";
 
+function lookupErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : "Lookup failed";
+  if (message.includes("No active trip for this vehicle")) {
+    return "This vehicle is registered, but the conductor has not started a fare session yet. Ask the crew to set the current trip and try again.";
+  }
+  return message;
+}
+
 export default function PayPage() {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [code, setCode] = useState("");
@@ -22,7 +30,7 @@ export default function PayPage() {
       setTrip(data);
       setStep(2);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Lookup failed");
+      setError(lookupErrorMessage(e));
     } finally {
       setLoading(false);
     }

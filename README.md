@@ -152,7 +152,8 @@ See [`server/.env.example`](server/.env.example) for the full list.
 2. Push to GitHub
 3. Go to [cloud.digitalocean.com/apps](https://cloud.digitalocean.com/apps) → create app → import from GitHub
 4. Set all secret env vars in the DO dashboard
-5. From that point, every push to `main` auto-deploys
+5. If you change `.do/app.yaml`, explicitly apply the app spec in DigitalOcean. Code pushes do not automatically update ingress rules or env scopes.
+6. From that point, every push to `main` auto-deploys code changes
 
 ---
 

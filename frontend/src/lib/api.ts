@@ -1,7 +1,11 @@
-// Use ?? (not ||) so that an explicit empty string means "same origin / use rewrites"
-// rather than falling back to localhost.  An unset variable still defaults to localhost
-// for bare `next dev` without a running proxy.
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
+// Default to same-origin so production can rely on App Platform ingress rules.
+// Local development still works because next.config.ts rewrites /api and /pay
+// to the Rust server when INTERNAL_API_URL is configured or falls back to localhost.
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '';
+
+function apiUrl(path: string): string {
+  return API_BASE ? `${API_BASE}${path}` : path;
+}
 
 const HEADERS: Record<string, string> = {};
 
@@ -56,14 +60,14 @@ export interface EnvStatus {
 
 export const api = {
   async getTrip(vehicleShortId: string): Promise<TripInfo> {
-    const res = await fetch(`${API_BASE}/api/qr/${encodeURIComponent(vehicleShortId)}`, {
+    const res = await fetch(apiUrl(`/api/qr/${encodeURIComponent(vehicleShortId)}`), {
       headers: HEADERS,
     });
     return handleResponse<TripInfo>(res);
   },
 
   async initiatePayment(vehicleShortId: string, passengerPhone: string): Promise<PaymentResult> {
-    const res = await fetch(`${API_BASE}/api/pay/qr`, {
+    const res = await fetch(apiUrl('/api/pay/qr'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...HEADERS },
       body: JSON.stringify({ vehicle_short_id: vehicleShortId, passenger_phone: passengerPhone }),
@@ -72,7 +76,7 @@ export const api = {
   },
 
   async setTrip(phone: string, pin: string, route: string, destination: string, fareAmount: number): Promise<SetTripResult> {
-    const res = await fetch(`${API_BASE}/api/conductor/trip`, {
+    const res = await fetch(apiUrl('/api/conductor/trip'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...HEADERS },
       body: JSON.stringify({ auth: { phone, pin }, trip: { route, destination, fare_amount: fareAmount } }),
@@ -81,7 +85,7 @@ export const api = {
   },
 
   async registerVehicle(plate: string, shortId: string, saccoName: string, paybillNo: string): Promise<RegisterResult> {
-    const res = await fetch(`${API_BASE}/api/vehicles/register`, {
+    const res = await fetch(apiUrl('/api/vehicles/register'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...HEADERS },
       body: JSON.stringify({ plate, short_id: shortId, sacco_name: saccoName, paybill_no: paybillNo }),
@@ -90,7 +94,7 @@ export const api = {
   },
 
   async registerConductor(phone: string, name: string, vehicleShortId: string, pin: string): Promise<RegisterResult> {
-    const res = await fetch(`${API_BASE}/api/conductors/register`, {
+    const res = await fetch(apiUrl('/api/conductors/register'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...HEADERS },
       body: JSON.stringify({ phone, name, vehicle_short_id: vehicleShortId, pin }),
@@ -99,7 +103,7 @@ export const api = {
   },
 
   async getEnvStatus(): Promise<EnvStatus> {
-    const res = await fetch(`${API_BASE}/api/settings`, {
+    const res = await fetch(apiUrl('/api/settings'), {
       headers: HEADERS,
     });
     return handleResponse<EnvStatus>(res);
@@ -131,7 +135,7 @@ export const api = {
 
   async getNearbyStops(lat: number, lon: number, radiusM = 2000): Promise<{ stops: NearbyStop[] }> {
     const res = await fetch(
-      `${API_BASE}/api/transit/stops/nearby?lat=${lat}&lon=${lon}&radius_m=${radiusM}`,
+      apiUrl(`/api/transit/stops/nearby?lat=${lat}&lon=${lon}&radius_m=${radiusM}`),
       { headers: HEADERS },
     );
     return handleResponse<{ stops: NearbyStop[] }>(res);
@@ -139,7 +143,7 @@ export const api = {
 
   async searchStops(q: string): Promise<{ stops: TransitStop[] }> {
     const res = await fetch(
-      `${API_BASE}/api/transit/stops/search?q=${encodeURIComponent(q)}`,
+      apiUrl(`/api/transit/stops/search?q=${encodeURIComponent(q)}`),
       { headers: HEADERS },
     );
     return handleResponse<{ stops: TransitStop[] }>(res);
@@ -147,7 +151,7 @@ export const api = {
 
   async planRoute(from: string, to: string): Promise<RoutePlanResponse> {
     const res = await fetch(
-      `${API_BASE}/api/transit/route?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+      apiUrl(`/api/transit/route?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
       { headers: HEADERS },
     );
     return handleResponse<RoutePlanResponse>(res);
@@ -155,19 +159,19 @@ export const api = {
 
   async findStage(destination: string): Promise<StageFindResponse> {
     const res = await fetch(
-      `${API_BASE}/api/transit/stages/find?destination=${encodeURIComponent(destination)}`,
+      apiUrl(`/api/transit/stages/find?destination=${encodeURIComponent(destination)}`),
       { headers: HEADERS },
     );
     return handleResponse<StageFindResponse>(res);
   },
 
   async getLiveVehicles(): Promise<{ vehicles: LiveVehicle[] }> {
-    const res = await fetch(`${API_BASE}/api/transit/vehicles/live`, { headers: HEADERS });
+    const res = await fetch(apiUrl('/api/transit/vehicles/live'), { headers: HEADERS });
     return handleResponse<{ vehicles: LiveVehicle[] }>(res);
   },
 
   async getJourney(paymentId: string): Promise<JourneyInfo> {
-    const res = await fetch(`${API_BASE}/api/journey/${paymentId}`, { headers: HEADERS });
+    const res = await fetch(apiUrl(`/api/journey/${paymentId}`), { headers: HEADERS });
     return handleResponse<JourneyInfo>(res);
   },
 
@@ -178,7 +182,7 @@ export const api = {
     description: string;
     reporter_phone?: string;
   }): Promise<{ success: boolean; message: string }> {
-    const res = await fetch(`${API_BASE}/api/transit/report`, {
+    const res = await fetch(apiUrl('/api/transit/report'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...HEADERS },
       body: JSON.stringify(payload),
@@ -187,12 +191,12 @@ export const api = {
   },
 
   async getReports(): Promise<{ reports: RouteReport[] }> {
-    const res = await fetch(`${API_BASE}/api/transit/reports`, { headers: HEADERS });
+    const res = await fetch(apiUrl('/api/transit/reports'), { headers: HEADERS });
     return handleResponse<{ reports: RouteReport[] }>(res);
   },
 
   async sendGpsPing(phone: string, tripId: string, lat: number, lon: number, heading?: number): Promise<void> {
-    await fetch(`${API_BASE}/api/conductor/location`, {
+    await fetch(apiUrl('/api/conductor/location'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...HEADERS },
       body: JSON.stringify({ phone, trip_id: tripId, lat, lon, heading }),
