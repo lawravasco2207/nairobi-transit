@@ -1,4 +1,7 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+// Use ?? (not ||) so that an explicit empty string means "same origin / use rewrites"
+// rather than falling back to localhost.  An unset variable still defaults to localhost
+// for bare `next dev` without a running proxy.
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
 
 const HEADERS: Record<string, string> = {};
 
@@ -103,8 +106,20 @@ export const api = {
   },
 
   connectWS(onMessage: (data: unknown) => void, onOpen: () => void, onClose: () => void): WebSocket {
-    const wsBase = API_BASE.replace(/^http/, 'ws');
-    const ws = new WebSocket(`${wsBase}/api/conductor/ws`);
+    // WebSocket always needs an absolute URL.
+    // If API_BASE is set (e.g. in docker-compose: http://localhost:8080) use it
+    // directly; otherwise derive the origin from window.location so it works
+    // via the DO ingress rule that routes /api/conductor/ws straight to the
+    // Rust service (bypassing the Next.js proxy, which cannot upgrade WebSockets).
+    let wsUrl: string;
+    if (API_BASE) {
+      wsUrl = `${API_BASE.replace(/^http/, 'ws')}/api/conductor/ws`;
+    } else {
+      const proto = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host  = typeof window !== 'undefined' ? window.location.host : 'localhost:8080';
+      wsUrl = `${proto}//${host}/api/conductor/ws`;
+    }
+    const ws = new WebSocket(wsUrl);
     ws.onmessage = (e) => onMessage(JSON.parse(e.data));
     ws.onopen = onOpen;
     ws.onclose = onClose;

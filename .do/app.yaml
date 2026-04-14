@@ -3,9 +3,8 @@
 # Or import via: https://cloud.digitalocean.com/apps/new
 #
 # Before deploying:
-#   1. Push this repo to GitHub
-#   2. Replace YOUR_GITHUB_USERNAME and YOUR_REPO_NAME below
-#   3. Set all SECRET env vars in the DO dashboard (DATABASE_URL, REDIS_URL, etc.)
+#   1. Push this repo to GitHub (repo already set below)
+#   2. Set all SECRET env vars in the DO dashboard (DATABASE_URL, REDIS_URL, etc.)
 #      DATABASE_URL → the existing transitdb cluster connection string
 #      REDIS_URL    → the Azure Redis connection string (rediss://...)
 #
@@ -14,6 +13,16 @@
 # via the DO dashboard after creating the app.
 #
 # Region: fra (Frankfurt) — closest major region to Nairobi
+#
+# ── Routing architecture ──────────────────────────────────────────────
+# ALL public HTTP traffic goes to the Next.js "web" service, which
+# server-side-proxies /api/** and /pay/** to the Rust "api" service via
+# the INTERNAL_API_URL (DO private-network binding).
+#
+# The ONLY exception is the conductor WebSocket (/api/conductor/ws):
+# WebSocket upgrade connections cannot be proxied by Next.js rewrites, so
+# that single path is routed by the ingress directly to the Rust service.
+# ─────────────────────────────────────────────────────────────────────
 
 name: nairobi-transit
 region: fra
@@ -22,7 +31,7 @@ services:
   # ── Rust/Axum API ─────────────────────────────────────────────
   - name: api
     dockerfile_path: server/Dockerfile
-    source_dir: /server
+    source_dir: server          # relative path — no leading slash
     github:
       repo: lawravasco2207/nairobi-transit
       branch: main
@@ -67,9 +76,11 @@ services:
       - key: DARAJA_BASE_URL
         scope: RUN_TIME
         value: https://sandbox.safaricom.co.ke
+      # QR_BASE_URL must include the /pay path segment so the generated
+      # QR URL resolves to /pay/<vehicle_id> on the public domain.
       - key: QR_BASE_URL
         scope: RUN_TIME
-        value: https://nairobi-transit-ainty.ondigitalocean.app
+        value: https://nairobi-transit-ainty.ondigitalocean.app/pay
       - key: DARAJA_CALLBACK_URL
         scope: RUN_TIME
         value: https://nairobi-transit-ainty.ondigitalocean.app/api/daraja/callback
@@ -77,7 +88,7 @@ services:
   # ── Next.js frontend ──────────────────────────────────────────
   - name: web
     dockerfile_path: frontend/Dockerfile
-    source_dir: /frontend
+    source_dir: frontend        # relative path — no leading slash
     github:
       repo: lawravasco2207/nairobi-transit
       branch: main
@@ -85,12 +96,20 @@ services:
     http_port: 3000
     instance_count: 1
     instance_size_slug: basic-xxs
-    build_command: ""   # Dockerfile handles the build
+    # build_command is for buildpack deployments; Dockerfile builds must omit it.
     envs:
-      # Baked into the Next.js bundle at build time
+      # NEXT_PUBLIC_API_URL is empty so the browser uses same-origin relative
+      # URLs.  All /api/* requests then reach the Next.js server which proxies
+      # them to the Rust service via INTERNAL_API_URL (see next.config.ts).
       - key: NEXT_PUBLIC_API_URL
         scope: BUILD_TIME
-        value: https://nairobi-transit-ainty.ondigitalocean.app
+        value: ""
+      # Private-network URL of the Rust "api" component, injected at runtime
+      # by DO App Platform.  Used by the Next.js proxy rewrites so they can
+      # reach the Rust service without going over the public internet.
+      - key: INTERNAL_API_URL
+        scope: RUN_TIME
+        value: ${api.PRIVATE_URL}
 
 # Note: No databases section — the existing DO PostgreSQL cluster
 # (nairobi-transit-db) and Azure Redis are referenced via SECRET env vars.
@@ -100,18 +119,17 @@ services:
 
 ingress:
   rules:
-    # All /api/* and /health traffic → Rust API
+    # ── WebSocket (conductor live feed) ──────────────────────────
+    # Must reach the Rust service directly; Next.js rewrites cannot
+    # proxy WebSocket upgrade requests.
     - component:
         name: api
       match:
         path:
-          prefix: /api
-    - component:
-        name: api
-      match:
-        path:
-          prefix: /health
-    # Everything else → Next.js frontend
+          prefix: /api/conductor/ws
+    # ── Everything else → Next.js ─────────────────────────────────
+    # The Next.js server proxies /api/** and /pay/** to the Rust service
+    # internally (see frontend/next.config.ts rewrites).
     - component:
         name: web
       match:

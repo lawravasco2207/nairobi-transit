@@ -21,8 +21,12 @@ services:
     build:
       context: ./frontend
       args:
-        # Browser-side: reaches backend via host-mapped port
-        NEXT_PUBLIC_API_URL: http://localhost:8080
+        # Empty string = use same-origin relative URLs; Next.js proxy rewrites
+        # (next.config.ts) forward /api/** to the Rust service via INTERNAL_API_URL.
+        NEXT_PUBLIC_API_URL: ""
+    environment:
+      # Tells the Next.js server where to proxy API calls (Compose service name).
+      - INTERNAL_API_URL=http://app:8080
     ports:
       - "3000:3000"
     depends_on:
