@@ -130,8 +130,8 @@ export default function TransitMap({
               center={[stop.lat, stop.lon]}
               radius={isBoard || isAlight ? 9 : 5}
               pathOptions={{
-                color: isBoard ? "#00A650" : isAlight ? "#E74C3C" : color,
-                fillColor: isBoard ? "#00A650" : isAlight ? "#E74C3C" : "white",
+                color: isBoard ? "#0066CC" : isAlight ? "#E74C3C" : color,
+                fillColor: isBoard ? "#4DA6FF" : isAlight ? "#E74C3C" : "white",
                 fillOpacity: 1,
                 weight: 2,
               }}

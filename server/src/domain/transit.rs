@@ -85,7 +85,8 @@ pub struct DirectRouteRow {
     pub fare_kes: i32,
     pub from_stop_name: String,
     pub to_stop_name: String,
-    pub seq_diff: i32,
+    pub from_stop_sequence: i32,
+    pub to_stop_sequence: i32,
 }
 
 /// Raw row from the transfer-route query.
@@ -103,6 +104,8 @@ pub struct TransferRouteRow {
     pub transfer_stop_name: String,
     pub transfer_lat: f64,
     pub transfer_lon: f64,
+    pub from_stop_sequence: i32,
+    pub transfer_stop_sequence_leg1: i32,
     pub route2_id: i32,
     pub route2_number: String,
     pub route2_name: String,
@@ -111,6 +114,8 @@ pub struct TransferRouteRow {
     pub stage2_lon: Option<f64>,
     pub fare2_kes: i32,
     pub to_stop_name: String,
+    pub transfer_stop_sequence_leg2: i32,
+    pub to_stop_sequence: i32,
     pub leg1_seq_diff: i32,
     pub leg2_seq_diff: i32,
 }

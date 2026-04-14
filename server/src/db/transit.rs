@@ -150,7 +150,8 @@ pub async fn find_direct_routes(
             COALESCE(r.typical_fare_max, 60) AS fare_kes,
             s_from.name             AS from_stop_name,
             s_to.name               AS to_stop_name,
-            (rs_to.stop_sequence - rs_from.stop_sequence) AS seq_diff
+            rs_from.stop_sequence   AS from_stop_sequence,
+            rs_to.stop_sequence     AS to_stop_sequence
         FROM transit_routes r
         JOIN route_stops rs_from ON rs_from.route_id = r.id
             AND rs_from.stop_id = ANY($1)
@@ -191,6 +192,8 @@ pub async fn find_transfer_routes(
             s_xfer.name                 AS transfer_stop_name,
             s_xfer.lat                  AS transfer_lat,
             s_xfer.lon                  AS transfer_lon,
+            rs_from.stop_sequence       AS from_stop_sequence,
+            rs_xfer1.stop_sequence      AS transfer_stop_sequence_leg1,
             r2.id                       AS route2_id,
             r2.route_number             AS route2_number,
             r2.route_name               AS route2_name,
@@ -199,6 +202,8 @@ pub async fn find_transfer_routes(
             r2.stage_lon                AS stage2_lon,
             COALESCE(r2.typical_fare_max, 60) AS fare2_kes,
             s_to.name                   AS to_stop_name,
+            rs_xfer2.stop_sequence      AS transfer_stop_sequence_leg2,
+            rs_to.stop_sequence         AS to_stop_sequence,
             (rs_xfer1.stop_sequence - rs_from.stop_sequence) AS leg1_seq_diff,
             (rs_to.stop_sequence - rs_xfer2.stop_sequence)   AS leg2_seq_diff
         FROM transit_routes r1

@@ -2,15 +2,23 @@ use axum::{
     extract::{Path, Query, State},
     Json,
 };
+use chrono::{Datelike, FixedOffset, Timelike, Utc, Weekday};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{
     db::transit as transit_db,
-    domain::transit::{JourneyInfo, LegStop, RouteLeg, RoutePlan, RouteReport},
+    domain::transit::{JourneyInfo, LegStop, RouteLeg, RoutePlan, RouteReport, RouteStopRow},
     error::AppError,
     AppState,
 };
+
+struct TrafficProfile {
+    speed_kmh: f64,
+    stop_dwell_minutes: f64,
+    boarding_buffer_minutes: f64,
+    transfer_buffer_minutes: i32,
+}
 
 // ── Stop Text Search ──────────────────────────────────────────────────────────
 
@@ -70,6 +78,7 @@ pub async fn plan_route(
     State(state): State<AppState>,
     Query(q): Query<PlanQuery>,
 ) -> Result<Json<serde_json::Value>, AppError> {
+    let traffic_profile = current_traffic_profile();
     let from_stops = transit_db::find_stops_by_text(&state.db, &q.from).await?;
     let to_stops = transit_db::find_stops_by_text(&state.db, &q.to).await?;
 
@@ -95,17 +104,12 @@ pub async fn plan_route(
     let direct = transit_db::find_direct_routes(&state.db, &origin_ids, &dest_ids).await?;
     for dr in &direct {
         let stops_on_route = transit_db::get_stops_on_route(&state.db, dr.route_id).await?;
-        let leg_stops: Vec<LegStop> = stops_on_route
-            .into_iter()
-            .map(|s| LegStop {
-                name: s.name,
-                lat: s.lat,
-                lon: s.lon,
-                sequence: s.stop_sequence,
-            })
-            .collect();
-
-        let est_minutes = (dr.seq_diff * 5).max(5);
+        let leg_stops = slice_leg_stops(
+            &stops_on_route,
+            dr.from_stop_sequence,
+            dr.to_stop_sequence,
+        );
+        let est_minutes = estimate_leg_minutes(&leg_stops, &traffic_profile);
         let leg = RouteLeg {
             leg_number: 1,
             route_number: dr.route_number.clone(),
@@ -139,17 +143,19 @@ pub async fn plan_route(
             let stops1 = transit_db::get_stops_on_route(&state.db, tr.route1_id).await?;
             let stops2 = transit_db::get_stops_on_route(&state.db, tr.route2_id).await?;
 
-            let leg1_stops: Vec<LegStop> = stops1
-                .into_iter()
-                .map(|s| LegStop { name: s.name, lat: s.lat, lon: s.lon, sequence: s.stop_sequence })
-                .collect();
-            let leg2_stops: Vec<LegStop> = stops2
-                .into_iter()
-                .map(|s| LegStop { name: s.name, lat: s.lat, lon: s.lon, sequence: s.stop_sequence })
-                .collect();
+            let leg1_stops = slice_leg_stops(
+                &stops1,
+                tr.from_stop_sequence,
+                tr.transfer_stop_sequence_leg1,
+            );
+            let leg2_stops = slice_leg_stops(
+                &stops2,
+                tr.transfer_stop_sequence_leg2,
+                tr.to_stop_sequence,
+            );
 
-            let est1 = (tr.leg1_seq_diff * 5).max(5);
-            let est2 = (tr.leg2_seq_diff * 5).max(5);
+            let est1 = estimate_leg_minutes(&leg1_stops, &traffic_profile);
+            let est2 = estimate_leg_minutes(&leg2_stops, &traffic_profile);
 
             let leg1 = RouteLeg {
                 leg_number: 1,
@@ -188,7 +194,7 @@ pub async fn plan_route(
                     tr.to_stop_name,
                 ),
                 total_fare_kes: tr.fare1_kes + tr.fare2_kes,
-                total_minutes: est1 + est2 + 5, // +5 min transfer time
+                total_minutes: est1 + est2 + traffic_profile.transfer_buffer_minutes,
                 transfers: 1,
                 legs: vec![leg1, leg2],
             });
@@ -213,6 +219,107 @@ pub async fn plan_route(
         "to": q.to,
         "plans": plans,
     })))
+}
+
+fn slice_leg_stops(
+    stops: &[RouteStopRow],
+    start_sequence: i32,
+    end_sequence: i32,
+) -> Vec<LegStop> {
+    stops
+        .iter()
+        .filter(|stop| stop.stop_sequence >= start_sequence && stop.stop_sequence <= end_sequence)
+        .map(|stop| LegStop {
+            name: stop.name.clone(),
+            lat: stop.lat,
+            lon: stop.lon,
+            sequence: stop.stop_sequence,
+        })
+        .collect()
+}
+
+fn estimate_leg_minutes(stops: &[LegStop], traffic_profile: &TrafficProfile) -> i32 {
+    if stops.len() < 2 {
+        return traffic_profile.boarding_buffer_minutes.ceil() as i32;
+    }
+
+    let distance_km: f64 = stops
+        .windows(2)
+        .map(|pair| haversine_km(pair[0].lat, pair[0].lon, pair[1].lat, pair[1].lon))
+        .sum();
+    let dwell_minutes = (stops.len().saturating_sub(2) as f64) * traffic_profile.stop_dwell_minutes;
+    let moving_minutes = (distance_km / traffic_profile.speed_kmh) * 60.0;
+
+    (moving_minutes + dwell_minutes + traffic_profile.boarding_buffer_minutes)
+        .round()
+        .max(8.0) as i32
+}
+
+fn current_traffic_profile() -> TrafficProfile {
+    let eat = FixedOffset::east_opt(3 * 60 * 60).expect("valid Nairobi offset");
+    let now = Utc::now().with_timezone(&eat);
+    let hour = now.hour();
+    let minute = now.minute();
+    let minutes_since_midnight = hour * 60 + minute;
+    let is_weekend = matches!(now.weekday(), Weekday::Sat | Weekday::Sun);
+
+    if is_weekend {
+        if (10 * 60..=20 * 60).contains(&minutes_since_midnight) {
+            return TrafficProfile {
+                speed_kmh: 15.5,
+                stop_dwell_minutes: 0.6,
+                boarding_buffer_minutes: 4.0,
+                transfer_buffer_minutes: 9,
+            };
+        }
+
+        return TrafficProfile {
+            speed_kmh: 20.0,
+            stop_dwell_minutes: 0.4,
+            boarding_buffer_minutes: 3.0,
+            transfer_buffer_minutes: 7,
+        };
+    }
+
+    if (6 * 60 + 30..=9 * 60 + 30).contains(&minutes_since_midnight)
+        || (16 * 60 + 30..=19 * 60 + 30).contains(&minutes_since_midnight)
+    {
+        return TrafficProfile {
+            speed_kmh: 11.5,
+            stop_dwell_minutes: 0.9,
+            boarding_buffer_minutes: 6.0,
+            transfer_buffer_minutes: 13,
+        };
+    }
+
+    if (9 * 60 + 31..=16 * 60 + 29).contains(&minutes_since_midnight) {
+        return TrafficProfile {
+            speed_kmh: 16.0,
+            stop_dwell_minutes: 0.65,
+            boarding_buffer_minutes: 4.0,
+            transfer_buffer_minutes: 9,
+        };
+    }
+
+    TrafficProfile {
+        speed_kmh: 22.0,
+        stop_dwell_minutes: 0.35,
+        boarding_buffer_minutes: 3.0,
+        transfer_buffer_minutes: 6,
+    }
+}
+
+fn haversine_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
+    let lat1 = lat1.to_radians();
+    let lat2 = lat2.to_radians();
+    let delta_lat = lat2 - lat1;
+    let delta_lon = (lon2 - lon1).to_radians();
+
+    let a = (delta_lat / 2.0).sin().powi(2)
+        + lat1.cos() * lat2.cos() * (delta_lon / 2.0).sin().powi(2);
+    let c = 2.0 * a.sqrt().asin();
+
+    6371.0 * c
 }
 
 // ── Stage Finder ──────────────────────────────────────────────────────────────
