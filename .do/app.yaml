@@ -15,13 +15,16 @@
 # Region: fra (Frankfurt) — closest major region to Nairobi
 #
 # ── Routing architecture ──────────────────────────────────────────────
-# ALL public HTTP traffic goes to the Next.js "web" service, which
-# server-side-proxies /api/** and /pay/** to the Rust "api" service via
-# the INTERNAL_API_URL (DO private-network binding).
+# The DO ingress routes /api/*, /pay/*, and /health directly to the Rust
+# "api" service.  Everything else goes to the Next.js "web" service.
 #
-# The ONLY exception is the conductor WebSocket (/api/conductor/ws):
-# WebSocket upgrade connections cannot be proxied by Next.js rewrites, so
-# that single path is routed by the ingress directly to the Rust service.
+# Previous approach used Next.js server-side rewrites to proxy /api/**
+# to the Rust service, but Next.js rewrites() are evaluated at BUILD time
+# and INTERNAL_API_URL (a DO runtime binding) isn't available during build,
+# causing the proxy destination to bake as http://localhost:8080 → 404.
+#
+# The Next.js rewrites in next.config.ts are kept for local development
+# (where localhost:8080 is the correct Rust server address).
 # ─────────────────────────────────────────────────────────────────────
 
 name: nairobi-transit
@@ -119,17 +122,32 @@ services:
 
 ingress:
   rules:
-    # ── WebSocket (conductor live feed) ──────────────────────────
-    # Must reach the Rust service directly; Next.js rewrites cannot
-    # proxy WebSocket upgrade requests.
+    # ── All API calls → Rust service directly ────────────────────
+    # Next.js rewrites() are evaluated at *build* time, but
+    # INTERNAL_API_URL is only available at runtime (DO component
+    # binding).  This means the proxy destination gets baked as
+    # http://localhost:8080 which doesn't exist in the frontend
+    # container → 404.  Routing /api/ at the ingress level avoids
+    # the problem entirely.  The Next.js rewrites still work for
+    # local development where localhost:8080 is correct.
     - component:
         name: api
       match:
         path:
-          prefix: /api/conductor/ws
-    # ── Everything else → Next.js ─────────────────────────────────
-    # The Next.js server proxies /api/** and /pay/** to the Rust service
-    # internally (see frontend/next.config.ts rewrites).
+          prefix: /api/
+    # ── Passenger pay page (HTML rendered by Rust) ───────────────
+    - component:
+        name: api
+      match:
+        path:
+          prefix: /pay/
+    # ── Health check ─────────────────────────────────────────────
+    - component:
+        name: api
+      match:
+        path:
+          prefix: /health
+    # ── Everything else → Next.js frontend ───────────────────────
     - component:
         name: web
       match:

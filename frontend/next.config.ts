@@ -5,17 +5,16 @@ const nextConfig: NextConfig = {
   output: "standalone",
 
   /**
-   * Server-side proxy rewrites.
+   * Server-side proxy rewrites — used for LOCAL DEVELOPMENT only.
    *
-   * INTERNAL_API_URL is injected at runtime by DO App Platform via the
-   * ${api.PRIVATE_URL} component binding (see .do/app.yaml).
-   * Locally it falls back to http://localhost:8080 so `next dev` works
-   * without any extra setup.
+   * In production (DO App Platform), the ingress routes /api/* and /pay/*
+   * directly to the Rust API service, bypassing Next.js entirely.
+   * These rewrites do NOT work in production because rewrites() is
+   * evaluated at build time and INTERNAL_API_URL is a runtime-only
+   * variable (DO component binding ${api.PRIVATE_URL}).
    *
-   * This proxy layer means the frontend container is the single public
-   * entry-point for all HTTP traffic.  The Rust API service only needs
-   * the one direct ingress rule kept for WebSocket connections
-   * (/api/conductor/ws) — everything else reaches it through here.
+   * Locally, INTERNAL_API_URL is unset so the fallback
+   * http://localhost:8080 correctly points to `cargo run`.
    */
   async rewrites() {
     const apiUrl = process.env.INTERNAL_API_URL ?? "http://localhost:8080";
